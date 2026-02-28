@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Tâches</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <nav class="navbar">
+        <span class="navbar-brand">📋 Task Board</span>
+    </nav>
+
+    <div class="container">
+
+        <!-- Formulaire ajout -->
+        <section class="card mb">
+            <div class="card-header">➕ Ajouter une tâche</div>
+            <div class="card-body">
+                <form action="/tache" method="POST">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Titre <span class="required">*</span></label>
+                            <input type="text" name="titre" placeholder="Ex: Préparer le rapport" required/>
+                        </div>
+                        <div class="form-group">
+                            <label>Responsable <span class="required">*</span></label>
+                            <input type="text" name="responsable" placeholder="Ex: Mamadou" required/>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea name="description" rows="2" placeholder="Décrivez la tâche..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Priorité <span class="required">*</span></label>
+                            <select name="priorite" required>
+                                <option value="">-- Choisir --</option>
+                                <option value="basse">↓ Basse</option>
+                                <option value="moyenne">→ Moyenne</option>
+                                <option value="haute">↑ Haute</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date limite</label>
+                            <input type="date" name="date_limite"/>
+                        </div>
+                        <div class="form-group align-end">
+                            <button type="submit" class="btn btn-primary">➕ Ajouter</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Dashboard -->
+        <%
+            const total   = taches.length;
+            const termine = taches.filter(t => t.statut === 'terminer').length;
+            const enCours = taches.filter(t => t.statut === 'en cours').length;
+            const aFaire  = taches.filter(t => t.statut === 'a faire').length;
+            const pct     = total > 0 ? Math.round((termine / total) * 100) : 0;
+            const today   = new Date();
+            today.setHours(0, 0, 0, 0);
+            function estEnRetard(t) {
+                if (!t.date_limite) return false;
+                if (t.statut === 'terminer') return false;
+                return new Date(t.date_limite) < today;
+            }
+            const retards = taches.filter(t => estEnRetard(t));
+        %>
+
+        <section class="dashboard mb">
+            <div class="stat-card stat-total">
+                <div class="stat-icon">📋</div>
+                <div class="stat-info">
+                    <div class="stat-number"><%= total %></div>
+                    <div class="stat-label">Total</div>
+                </div>
+            </div>
+            <div class="stat-card stat-faire">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-info">
+                    <div class="stat-number"><%= aFaire %></div>
+                    <div class="stat-label">À faire</div>
+                </div>
+            </div>
+            <div class="stat-card stat-cours">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-info">
+                    <div class="stat-number"><%= enCours %></div>
+                    <div class="stat-label">En cours</div>
+                </div>
+            </div>
+            <div class="stat-card stat-termine">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <div class="stat-number"><%= termine %></div>
+                    <div class="stat-label">Terminées</div>
+                </div>
+            </div>
+            <div class="stat-card stat-retard">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-info">
+                    <div class="stat-number"><%= retards.length %></div>
+                    <div class="stat-label">En retard</div>
+                </div>
+            </div>
+            <div class="stat-card stat-progress">
+                <div class="progress-header">
+                    <span class="stat-label">Progression globale</span>
+                    <span class="pct-value"><%= pct %>%</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill"></div>
+                </div>
+                <div class="progress-sub"><%= termine %> tâche<%= termine > 1 ? 's' : '' %> terminée<%= termine > 1 ? 's' : '' %> sur <%= total %></div>
+            </div>
+        </section>
+
+        <!-- Alerte retard -->
+        <% if (retards.length > 0) { %>
+        <div class="alerte-retard mb">
+            <div class="alerte-title">
+                <span class="pulse-dot"></span>
+                ⚠ <%= retards.length %> tâche<%= retards.length > 1 ? 's' : '' %> en retard
+            </div>
+            <ul class="alerte-liste">
+                <% retards.forEach(t => { %>
+                    <%
+                        const dl = new Date(t.date_limite);
+                        const jours = Math.floor((today - dl) / (1000*60*60*24));
+                        const dlFormatted = dl.toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'numeric'});
+                    %>
+                    <li>
+                        <strong><%= t.titre %></strong> — échéance <%= dlFormatted %>
+                        <span class="badge badge-danger">+<%= jours %>j</span>
+                        <span class="badge badge-grey"><%= t.statut %></span>
+                    </li>
+                <% }) %>
+            </ul>
+        </div>
+        <% } %>
+
+        <!-- Recherche + Filtres -->
+        <section class="card mb">
+            <div class="card-body">
+                <div class="filter-row">
+                    <div class="form-group">
+                        <label>🔍 Recherche</label>
+                        <input type="text" id="search-input" placeholder="Titre ou description..."/>
+                    </div>
+                    <div class="form-group">
+                        <label>Statut</label>
+                        <select id="filter-statut">
+                            <option value="all">Tous</option>
+                            <option value="a faire">À faire</option>
+                            <option value="en cours">En cours</option>
+                            <option value="terminer">Terminées</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Priorité</label>
+                        <select id="filter-priorite">
+                            <option value="all">Toutes</option>
+                            <option value="basse">↓ Basse</option>
+                            <option value="moyenne">→ Moyenne</option>
+                            <option value="haute">↑ Haute</option>
+                        </select>
+                    </div>
+                    <div class="form-group align-end">
+                        <button class="btn btn-secondary" onclick="resetFiltres()">✕ Réinitialiser</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="results-count" id="results-count"></div>
+
+        <!-- Liste des tâches -->
+        <div class="tasks-grid" id="tasks-container">
+            <% taches.forEach(tache => { %>
+                <%
+                    const dlDate   = tache.date_limite ? new Date(tache.date_limite) : null;
+                    const enRetard = dlDate && tache.statut !== 'terminer' && dlDate < today;
+                    const diff     = dlDate ? Math.ceil((dlDate - today) / (1000*60*60*24)) : null;
+                    const dateVal  = dlDate ? dlDate.toISOString().split('T')[0] : '';
+                %>
+                <div class="task-card <%= enRetard ? 'task-retard' : '' %>"
+                     data-titre="<%= tache.titre.toLowerCase() %>"
+                     data-description="<%= (tache.description || '').toLowerCase() %>"
+                     data-statut="<%= tache.statut %>"
+                     data-priorite="<%= tache.priorite %>">
+
+                    <div class="task-header task-header-<%= tache.statut.replace(' ', '-') %>">
+                        <span class="task-titre"><%= tache.titre %></span>
+                        <% if (enRetard) { %><span class="badge badge-danger badge-pulse">⚠ Retard</span><% } %>
+                    </div>
+
+                    <div class="task-body">
+                        <p class="task-description"><%= tache.description || 'Aucune description' %></p>
+
+                        <div class="task-meta">
+                            <span class="badge badge-priorite-<%= tache.priorite %>">
+                                <%= tache.priorite === 'basse' ? '↓' : tache.priorite === 'moyenne' ? '→' : '↑' %> <%= tache.priorite %>
+                            </span>
+                            <span class="badge badge-grey">👤 <%= tache.responsable %></span>
+                            <% if (dlDate) { %>
+                                <span class="badge <%= enRetard ? 'badge-danger' : diff <= 3 ? 'badge-warning' : 'badge-grey' %>">
+                                    📅 <%= dlDate.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'}) %>
+                                    (<%= diff < 0 ? 'Dépassée' : diff === 0 ? 'Auj.' : 'J-' + diff %>)
+                                </span>
+                            <% } %>
+                        </div>
+
+                        <div class="task-actions">
+                            <!-- Changement statut -->
+                            <% if (tache.statut === 'a faire') { %>
+                                <a href="/tache/statut/<%= tache.id %>?next=en cours" class="btn btn-info">▶ Démarrer</a>
+                            <% } else if (tache.statut === 'en cours') { %>
+                                <a href="/tache/statut/<%= tache.id %>?next=terminer" class="btn btn-success">✔ Terminer</a>
+                            <% } else { %>
+                                <button class="btn btn-disabled" disabled>✅ Terminée</button>
+                            <% } %>
+
+                            <!-- Modifier (ouvre le modal) -->
+                            <button class="btn btn-warning" 
+                                onclick='ouvrirModal(
+                                    <%= tache.id %>,
+                                    <%- JSON.stringify(tache.titre) %>,
+                                    <%- JSON.stringify(tache.description || "") %>,
+                                    <%- JSON.stringify(tache.priorite) %>,
+                                    <%- JSON.stringify(tache.statut) %>,
+                                    <%- JSON.stringify(dateVal) %>,
+                                    <%- JSON.stringify(tache.responsable) %>
+                                )'>✏ Modifier</button>
+
+                            <!-- Supprimer -->
+                            <a href="/tache/supprimer/<%= tache.id %>"
+                               class="btn btn-danger"
+                               onclick="return confirm('Supprimer cette tâche ?')">🗑 Supprimer</a>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+
+        <div class="empty-state" id="empty-state" style="display:none">
+            📭 Aucune tâche trouvée
+        </div>
+
+        <!-- Modal modification -->
+        <div class="modal-overlay" id="modal-overlay" style="display:none">
+            <div class="modal">
+                <div class="modal-header">
+                    ✏ Modifier la tâche
+                    <button onclick="fermerModal()" class="modal-close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-modifier" action="" method="POST">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Titre <span class="required">*</span></label>
+                                <input type="text" name="titre" id="mod-titre" required/>
+                            </div>
+                            <div class="form-group">
+                                <label>Responsable <span class="required">*</span></label>
+                                <input type="text" name="responsable" id="mod-responsable" required/>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <textarea name="description" id="mod-description" rows="2"></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Priorité</label>
+                                <select name="priorite" id="mod-priorite">
+                                    <option value="basse">↓ Basse</option>
+                                    <option value="moyenne">→ Moyenne</option>
+                                    <option value="haute">↑ Haute</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Statut</label>
+                                <select name="statut" id="mod-statut">
+                                    <option value="a faire">⏳ À faire</option>
+                                    <option value="en cours">⚡ En cours</option>
+                                    <option value="terminer">✅ Terminée</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Date limite</label>
+                                <input type="date" name="date_limite" id="mod-date"/>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group align-end">
+                                <button type="submit" class="btn btn-primary">💾 Enregistrer</button>
+                            </div>
+                            <div class="form-group align-end">
+                                <button type="button" onclick="fermerModal()" class="btn btn-secondary">✕ Annuler</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const items   = document.querySelectorAll('.task-card');
+        const countEl = document.getElementById('results-count');
+        const emptyEl = document.getElementById('empty-state');
+
+        // ─── Filtres ──────────────────────────────────────────────────────────
+        function applyFilters() {
+            const kw       = document.getElementById('search-input').value.toLowerCase().trim();
+            const statut   = document.getElementById('filter-statut').value;
+            const priorite = document.getElementById('filter-priorite').value;
+            let visible = 0;
+
+            items.forEach(item => {
+                const matchSearch   = !kw || item.dataset.titre.includes(kw) || item.dataset.description.includes(kw);
+                const matchStatut   = statut   === 'all' || item.dataset.statut   === statut;
+                const matchPriorite = priorite === 'all' || item.dataset.priorite === priorite;
+                const show = matchSearch && matchStatut && matchPriorite;
+                item.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            const isFiltered = kw || statut !== 'all' || priorite !== 'all';
+            countEl.textContent = isFiltered
+                ? `${visible} tâche${visible > 1 ? 's' : ''} trouvée${visible > 1 ? 's' : ''}`
+                : '';
+            emptyEl.style.display = visible === 0 ? 'block' : 'none';
+        }
+
+        function resetFiltres() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('filter-statut').value = 'all';
+            document.getElementById('filter-priorite').value = 'all';
+            applyFilters();
+        }
+
+        document.getElementById('search-input').addEventListener('input', applyFilters);
+        document.getElementById('filter-statut').addEventListener('change', applyFilters);
+        document.getElementById('filter-priorite').addEventListener('change', applyFilters);
+
+        //  Modal modification 
+        function ouvrirModal(id, titre, description, priorite, statut, date, responsable) {
+            document.getElementById('mod-titre').value       = titre;
+            document.getElementById('mod-description').value = description;
+            document.getElementById('mod-responsable').value = responsable;
+            document.getElementById('mod-priorite').value    = priorite;
+            document.getElementById('mod-statut').value      = statut;
+            document.getElementById('mod-date').value        = date;
+            document.getElementById('form-modifier').action  = '/tache/modifier/' + id;
+            document.getElementById('modal-overlay').style.display = 'flex';
+        }
+
+        function fermerModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+
+        // Fermer si clic en dehors du modal
+        document.getElementById('modal-overlay').addEventListener('click', function(e) {
+            if (e.target === this) fermerModal();
+        });
+    </script>
+
+</body>
+</html>
